@@ -1,12 +1,12 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+console.log('페이지 로드됨')  // 이 줄 추가
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 const COLS = 1400
 const ROWS = 1100
 
-// 실제 맨체스터 행정 경계 (단순화된 좌표)
 const MANCHESTER_POLYGON: number[][] = [
   [0.028,0.463],[0.041,0.486],[0.054,0.491],[0.074,0.512],[0.080,0.515],
   [0.083,0.516],[0.084,0.516],[0.088,0.520],[0.103,0.521],[0.107,0.533],
@@ -76,6 +76,9 @@ function buildMask(): Set<number> {
   return mask
 }
 
+const COLOR_A = '#DC2626'
+const COLOR_B = '#2563EB'
+
 export default function ManchesterPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const maskRef = useRef<Set<number>>(new Set())
@@ -87,66 +90,14 @@ export default function ManchesterPage() {
   const [counts, setCounts] = useState({ a: 0, b: 0 })
   const [pending, setPending] = useState(0)
 
-  const COLOR_A = '#DC2626'
-  const COLOR_B = '#2563EB'
-
-  useEffect(() => {
-    maskRef.current = buildMask()
-    
-    // DB에서 기존 픽셀 불러오기
-    const loadPixels = async () => {
-      const { data, error } = await supabase
-        .from('pixels')
-        .select('pixel_index, team')
-        .eq('derby_id', 'manchester')
-      
-      if (data) {
-        const grid = gridRef.current
-        let a = 0, b = 0
-        data.forEach(p => {
-          grid[p.pixel_index] = p.team === 'a' ? 1 : 2
-          p.team === 'a' ? a++ : b++
-        })
-        setCounts({ a, b })
-      }
-      drawAll()
-    }
-
-    loadPixels()
-
-    // 실시간 구독
-    const channel = supabase
-      .channel('pixels-manchester')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'pixels',
-        filter: 'derby_id=eq.manchester'
-      }, (payload) => {
-        const { pixel_index, team } = payload.new
-        const grid = gridRef.current
-        if (grid[pixel_index] === 0) {
-          grid[pixel_index] = team === 'a' ? 1 : 2
-          const canvas = canvasRef.current!
-          const ctx = canvas.getContext('2d')!
-          ctx.fillStyle = team === 'a' ? COLOR_A : COLOR_B
-          ctx.fillRect(pixel_index % COLS, Math.floor(pixel_index / COLS), 1, 1)
-          setCounts(prev => ({ ...prev, [team]: prev[team as 'a' | 'b'] + 1 }))
-        }
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [])
-
-  function drawAll() {
+ const drawAll = useCallback((grid: Uint8Array, mask: Set<number>) => {
     const canvas = canvasRef.current
+    console.log('drawAll 실행, canvas:', canvas)  // 추가
     if (!canvas) return
     const ctx = canvas.getContext('2d')!
     ctx.fillStyle = '#0a0a0a'
     ctx.fillRect(0, 0, COLS, ROWS)
 
-    // 배경 도시 느낌 격자
     ctx.strokeStyle = 'rgba(255,255,255,0.03)'
     ctx.lineWidth = 1
     for (let i = 0; i < COLS; i += 40) {
@@ -156,16 +107,15 @@ export default function ManchesterPage() {
       ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(COLS, i); ctx.stroke()
     }
 
-    const grid = gridRef.current
-    maskRef.current.forEach(idx => {
-      const r = Math.floor(idx / COLS), c = idx % COLS
-      if (grid[idx] === 1) ctx.fillStyle = COLOR_A
-      else if (grid[idx] === 2) ctx.fillStyle = COLOR_B
-      else ctx.fillStyle = '#1e1e2a'
-      ctx.fillRect(c, r, 1, 1)
-    })
+   mask.forEach(idx => {
+  const r = Math.floor(idx / COLS), c = idx % COLS
+  if (grid[idx] === 1) ctx.fillStyle = COLOR_A
+  else if (grid[idx] === 2) ctx.fillStyle = COLOR_B
+  else ctx.fillStyle = '#1e1e2a'
+  ctx.fillRect(c, r, 1, 1)
+})
+console.log('그리기 완료, grid[52794]:', grid[52794])  // 추가
 
-    // 경계선
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'
     ctx.lineWidth = 1.5
     ctx.beginPath()
@@ -176,8 +126,66 @@ export default function ManchesterPage() {
     }
     ctx.closePath()
     ctx.stroke()
+  }, [])
 
-  }
+ useEffect(() => {
+    console.log('useEffect 실행됨')
+    const mask = buildMask()
+    console.log('마스크 크기:', mask.size)
+    maskRef.current = mask
+    const grid = gridRef.current
+
+    const loadPixels = async () => {
+      console.log('loadPixels 시작')
+      const { data, error } = await supabase
+        .from('pixels')
+        .select('pixel_index, team')
+        .eq('derby_id', 'manchester')
+      
+      console.log('data:', data, 'error:', error)
+
+      if (data && data.length > 0) {
+        let a = 0, b = 0
+        data.forEach(p => {
+          const idx = Number(p.pixel_index)
+          if (mask.has(idx)) {
+            grid[idx] = p.team === 'a' ? 1 : 2
+            p.team === 'a' ? a++ : b++
+          }
+        })
+        setCounts({ a, b })
+        setTimeout(() => {
+          drawAll(grid, mask)
+        }, 100)
+      } else {
+        drawAll(grid, mask)
+      }
+    }  // ← 여기 닫는 괄호
+
+    loadPixels()
+
+    const channel = supabase
+      .channel('pixels-manchester')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'pixels',
+        filter: 'derby_id=eq.manchester'
+      }, (payload: any) => {
+        const { pixel_index, team } = payload.new
+        if (grid[pixel_index] === 0) {
+          grid[pixel_index] = team === 'a' ? 1 : 2
+          const canvas = canvasRef.current!
+          const ctx = canvas.getContext('2d')!
+          ctx.fillStyle = team === 'a' ? COLOR_A : COLOR_B
+          ctx.fillRect(pixel_index % COLS, Math.floor(pixel_index / COLS), 1, 1)
+          setCounts((prev: any) => ({ ...prev, [team]: prev[team] + 1 }))
+        }
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   function getPos(e: React.MouseEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current!
@@ -243,7 +251,7 @@ export default function ManchesterPage() {
   function clearSelection() {
     pendingRef.current = new Set()
     setPending(0)
-    drawAll()
+    drawAll(gridRef.current, maskRef.current)
   }
 
   const totalSold = counts.a + counts.b
