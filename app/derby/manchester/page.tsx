@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 const COLS = 1400
 const ROWS = 1100
@@ -91,7 +92,51 @@ export default function ManchesterPage() {
 
   useEffect(() => {
     maskRef.current = buildMask()
-    drawAll()
+    
+    // DB에서 기존 픽셀 불러오기
+    const loadPixels = async () => {
+      const { data, error } = await supabase
+        .from('pixels')
+        .select('pixel_index, team')
+        .eq('derby_id', 'manchester')
+      
+      if (data) {
+        const grid = gridRef.current
+        let a = 0, b = 0
+        data.forEach(p => {
+          grid[p.pixel_index] = p.team === 'a' ? 1 : 2
+          p.team === 'a' ? a++ : b++
+        })
+        setCounts({ a, b })
+      }
+      drawAll()
+    }
+
+    loadPixels()
+
+    // 실시간 구독
+    const channel = supabase
+      .channel('pixels-manchester')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'pixels',
+        filter: 'derby_id=eq.manchester'
+      }, (payload) => {
+        const { pixel_index, team } = payload.new
+        const grid = gridRef.current
+        if (grid[pixel_index] === 0) {
+          grid[pixel_index] = team === 'a' ? 1 : 2
+          const canvas = canvasRef.current!
+          const ctx = canvas.getContext('2d')!
+          ctx.fillStyle = team === 'a' ? COLOR_A : COLOR_B
+          ctx.fillRect(pixel_index % COLS, Math.floor(pixel_index / COLS), 1, 1)
+          setCounts(prev => ({ ...prev, [team]: prev[team as 'a' | 'b'] + 1 }))
+        }
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   function drawAll() {
@@ -194,7 +239,7 @@ export default function ManchesterPage() {
       alert('Something went wrong!')
     }
   }
-  
+
   function clearSelection() {
     pendingRef.current = new Set()
     setPending(0)
