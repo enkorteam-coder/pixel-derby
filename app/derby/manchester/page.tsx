@@ -153,34 +153,52 @@ console.log('그리기 완료, grid[52794]:', grid[52794])  // 추가
     maskRef.current = mask
     const grid = gridRef.current
 
-    const loadPixels = async () => {
-      console.log('loadPixels 시작')
-     const { data, error } = await supabase
-  .from('pixels')
-  .select('pixel_index, team')
-  .eq('derby_id', 'manchester')
-  .limit(100000)
-      
-      console.log('data:', data, 'error:', error)
+const loadPixels = async () => {
+  console.log('loadPixels 시작')
+  let allData: any[] = []
+  let from = 0
+  const batchSize = 1000
 
-      if (data && data.length > 0) {
-        let a = 0, b = 0
-        data.forEach(p => {
-          const idx = Number(p.pixel_index)
-          if (mask.has(idx)) {
-            grid[idx] = p.team === 'a' ? 1 : 2
-            p.team === 'a' ? a++ : b++
-          }
-        })
-        setCounts({ a, b })
-        setTimeout(() => {
-          drawAll(grid, mask)
-        }, 100)
-      } else {
-        drawAll(grid, mask)
+  while (true) {
+    const { data, error } = await supabase
+      .from('pixels')
+      .select('pixel_index, team')
+      .eq('derby_id', 'manchester')
+      .range(from, from + batchSize - 1)
+
+    if (error) {
+      console.log('error:', error)
+      break
+    }
+
+    if (data && data.length > 0) {
+      allData = [...allData, ...data]
+      if (data.length < batchSize) break
+      from += batchSize
+    } else {
+      break
+    }
+  }
+
+  console.log('전체 픽셀 수:', allData.length)
+
+  if (allData.length > 0) {
+    let a = 0, b = 0
+    allData.forEach(p => {
+      const idx = Number(p.pixel_index)
+      if (mask.has(idx)) {
+        grid[idx] = p.team === 'a' ? 1 : 2
+        p.team === 'a' ? a++ : b++
       }
-    }  // ← 여기 닫는 괄호
-
+    })
+    setCounts({ a, b })
+    setTimeout(() => {
+      drawAll(grid, mask)
+    }, 100)
+  } else {
+    drawAll(grid, mask)
+  }
+}
     loadPixels()
 
     const channel = supabase
