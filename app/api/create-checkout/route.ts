@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     })
 
     const order = await res.json()
-    console.log('PayPal order status:', order.status)
+    console.log('PayPal full response:', JSON.stringify(order))
     
     const approveUrl = order.links?.find((l: any) => l.rel === 'approve')?.href
     
