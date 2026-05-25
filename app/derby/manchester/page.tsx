@@ -90,6 +90,24 @@ export default function ManchesterPage() {
   const [counts, setCounts] = useState({ a: 0, b: 0 })
   const [pending, setPending] = useState(0)
 
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search)
+  const orderId = params.get('token')
+  const success = params.get('success')
+  console.log('첫번째 useEffect - orderId:', orderId, 'success:', success)
+  if (success === '1' && orderId) {
+    fetch('/api/capture-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId }),
+    }).then(r => r.json()).then(data => {
+      console.log('Payment captured:', data)
+      window.history.replaceState({}, '', '/derby/manchester')
+    })
+  }
+}, [])
+
+
  const drawAll = useCallback((grid: Uint8Array, mask: Set<number>) => {
     const canvas = canvasRef.current
     console.log('drawAll 실행, canvas:', canvas)  // 추가
@@ -220,7 +238,8 @@ console.log('그리기 완료, grid[52794]:', grid[52794])  // 추가
     setPending(pendingRef.current.size)
   }
 
-  async function handlePurchase() {
+async function handlePurchase() {
+    console.log('handlePurchase 시작', pendingRef.current.size)
     const pixels = [...pendingRef.current]
     if (pixels.length < 10) {
       alert('Minimum 10 pixels ($10) required!')
@@ -238,16 +257,17 @@ console.log('그리기 완료, grid[52794]:', grid[52794])  // 추가
         }),
       })
       const data = await res.json()
-      if (data.transactionId) {
-        window.location.href = `https://sandbox-buy.paddle.com/checkout/${data.transactionId}`
+      console.log('checkout response:', data)
+      if (data.url) {
+        window.location.href = data.url
       } else {
-        alert('Error: ' + data.error)
+        alert('Error: ' + (data.error || JSON.stringify(data)))
       }
-    } catch (err) {
-      alert('Something went wrong!')
+    } catch (err: any) {
+      console.error('handlePurchase error:', err)
+      alert('Error: ' + (err?.message || String(err)))
     }
   }
-
   function clearSelection() {
     pendingRef.current = new Set()
     setPending(0)

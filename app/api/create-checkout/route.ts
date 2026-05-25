@@ -1,32 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Environment, LogLevel, Paddle } from '@paddle/paddle-node-sdk'
 
-const paddle = new Paddle(process.env.PADDLE_API_KEY!, {
-  environment: Environment.production,
-  logLevel: LogLevel.none,
-})
+const PAYPAL_API = 'https://api-m.sandbox.paypal.com'
+
+async function getAccessToken() {
+  const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!
+  const secret = process.env.PAYPAL_SECRET!
+  const auth = Buffer.from(`${clientId}:${secret}`).toString('base64')
+  
+  const res = await fetch(`${PAYPAL_API}/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  })
+  const data = await res.json()
+  return data.access_token
+}
 
 export async function POST(req: NextRequest) {
   try {
     const { derbyId, team, pixelIndexes, pixelCount } = await req.json()
+    console.log('create-checkout 시작:', derbyId, team, pixelCount)
 
     if (pixelCount < 10) {
       return NextResponse.json({ error: 'Minimum 10 pixels required' }, { status: 400 })
     }
 
-    const transaction = await paddle.transactions.create({
-      items: [{
-        priceId: process.env.PADDLE_PRICE_ID!,
-        quantity: pixelCount,
-      }],
-      customData: {
-        derbyId,
-        team,
-        pixelIndexes: JSON.stringify(pixelIndexes),
+    const accessToken = await getAccessToken()
+    const amount = Number(pixelCount).toFixed(2)
+
+    const res = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        intent: 'CAPTURE',
+        purchase_units: [{
+          amount: {
+            currency_code: 'USD',
+            value: amount,
+          },
+          description: `${pixelCount} pixels - ${derbyId} (${team})`,
+          custom_id: `${derbyId}|${team}|${pixelIndexes.slice(0, 10).join(',')}`,
+        }],
+        application_context: {
+          return_url: `${process.env.NEXT_PUBLIC_SITE_URL}/derby/${derbyId}?success=1`,
+          cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/derby/${derbyId}?cancelled=1`,
+        }
+      }),
     })
 
-    return NextResponse.json({ transactionId: transaction.id })
+    const order = await res.json()
+    console.log('PayPal order status:', order.status)
+    
+    const approveUrl = order.links?.find((l: any) => l.rel === 'approve')?.href
+    
+    if (approveUrl) {
+      return NextResponse.json({ url: approveUrl, orderId: order.id })
+    } else {
+      return NextResponse.json({ error: 'Failed to create order', details: order }, { status: 500 })
+    }
 
   } catch (err: any) {
     console.error('Checkout error:', err)
