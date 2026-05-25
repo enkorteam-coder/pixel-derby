@@ -102,7 +102,7 @@ export default function ManchesterPage() {
       body: JSON.stringify({ orderId }),
     }).then(r => r.json()).then(data => {
       console.log('Payment captured:', data)
-      window.history.replaceState({}, '', '/derby/manchester')
+      window.location.href = '/derby/manchester'
     })
   }
 }, [])
