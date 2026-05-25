@@ -155,10 +155,11 @@ console.log('그리기 완료, grid[52794]:', grid[52794])  // 추가
 
     const loadPixels = async () => {
       console.log('loadPixels 시작')
-      const { data, error } = await supabase
-        .from('pixels')
-        .select('pixel_index, team')
-        .eq('derby_id', 'manchester')
+     const { data, error } = await supabase
+  .from('pixels')
+  .select('pixel_index, team')
+  .eq('derby_id', 'manchester')
+  .limit(100000)
       
       console.log('data:', data, 'error:', error)
 
