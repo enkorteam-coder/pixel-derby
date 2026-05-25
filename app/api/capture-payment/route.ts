@@ -41,7 +41,17 @@ export async function POST(req: NextRequest) {
     const parts = customId.split('|')
     const derbyId = parts[0]
     const team = parts[1]
-    const pixelIndexes = parts[2] ? parts[2].split(',').map(Number) : []
+    const tempOrderId = parts[2]
+
+    // Supabase에서 임시 저장된 픽셀 인덱스 가져오기
+    const { data: orderData } = await supabaseAdmin
+      .from('orders')
+      .select('pixel_indexes')
+      .eq('id', tempOrderId)
+      .single()
+
+    const pixelIndexes: number[] = orderData?.pixel_indexes || []
+    console.log('Pixel indexes from DB:', pixelIndexes.length)
 
     // 결제 캡처
     const captureRes = await fetch(`${PAYPAL_API}/v2/checkout/orders/${orderId}/capture`, {
@@ -75,6 +85,12 @@ export async function POST(req: NextRequest) {
           })))
         console.log(`✅ ${available.length} pixels saved!`)
       }
+
+      // 주문 상태 업데이트
+      await supabaseAdmin
+        .from('orders')
+        .update({ status: 'paid', pixel_count: available.length })
+        .eq('id', tempOrderId)
 
       return NextResponse.json({ success: true, pixelsSaved: available.length })
     }
