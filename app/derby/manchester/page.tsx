@@ -86,7 +86,7 @@ export default function ManchesterPage() {
   const isPainting = useRef(false)
   const pendingRef = useRef<Set<number>>(new Set())
   const [selectedTeam, setSelectedTeam] = useState<'a' | 'b'>('a')
-  const [brushSize, setBrushSize] = useState(4)
+  const [brushSize, setBrushSize] = useState(25)
   const [counts, setCounts] = useState({ a: 0, b: 0 })
   const [pending, setPending] = useState(0)
   const [maskSize, setMaskSize] = useState(0)
@@ -245,22 +245,63 @@ function paint(e: React.MouseEvent<HTMLCanvasElement>) {
     const b = brushSize  // 1~10
 
     // 브러시 크기 b = b×10 픽셀 선택 (가로×세로 정사각형)
-    const side = Math.round(Math.sqrt(b * 10))
+   // 25=5×5, 50=5×10, 100=10×10, 200=10×20
+const sizeMap: Record<number, [number, number]> = {
+  25: [5, 5],
+  50: [5, 10],
+  100: [10, 10],
+  200: [10, 20],
+}
+const [bRows, bCols] = sizeMap[brushSize] || [5, 5]
 
-    for (let dr = -Math.floor(side/2); dr <= Math.floor(side/2); dr++) {
-      for (let dc = -Math.floor(side/2); dc <= Math.floor(side/2); dc++) {
-        const nr = r + dr, nc = c + dc
-        if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue
-        const idx = nr * COLS + nc
-        if (maskRef.current.has(idx) && grid[idx] === 0 && !pendingRef.current.has(idx)) {
-          pendingRef.current.add(idx)
-          ctx.fillStyle = color + 'bb'
-          ctx.fillRect(nc, nr, 1, 1)
-        }
-      }
+for (let dr = 0; dr < bRows; dr++) {
+  for (let dc = 0; dc < bCols; dc++) {
+    const nr = r + dr, nc = c + dc
+    if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue
+    const idx = nr * COLS + nc
+    if (maskRef.current.has(idx) && grid[idx] === 0 && !pendingRef.current.has(idx)) {
+      pendingRef.current.add(idx)
+      ctx.fillStyle = color + 'bb'
+      ctx.fillRect(nc, nr, 1, 1)
     }
+  }
+}
     setPending(pendingRef.current.size)
   }
+
+  function paintTouch(e: React.TouchEvent<HTMLCanvasElement>) {
+  if (!isPainting.current) return
+  const canvas = canvasRef.current!
+  const rect = canvas.getBoundingClientRect()
+  const touch = e.touches[0]
+  const c = Math.floor((touch.clientX - rect.left) * (COLS / rect.width))
+  const r = Math.floor((touch.clientY - rect.top) * (ROWS / rect.height))
+  const ctx = canvas.getContext('2d')!
+  const grid = gridRef.current
+  const color = selectedTeam === 'a' ? COLOR_A : COLOR_B
+
+  const sizeMap: Record<number, [number, number]> = {
+    25: [5, 5],
+    50: [5, 10],
+    100: [10, 10],
+    200: [10, 20],
+  }
+  const [bRows, bCols] = sizeMap[brushSize] || [5, 5]
+
+  for (let dr = 0; dr < bRows; dr++) {
+    for (let dc = 0; dc < bCols; dc++) {
+      const nr = r + dr, nc = c + dc
+      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue
+      const idx = nr * COLS + nc
+      if (maskRef.current.has(idx) && grid[idx] === 0 && !pendingRef.current.has(idx)) {
+        pendingRef.current.add(idx)
+        ctx.fillStyle = color + 'bb'
+        ctx.fillRect(nc, nr, 1, 1)
+      }
+    }
+  }
+  setPending(pendingRef.current.size)
+}
 
 async function handlePurchase() {
     console.log('handlePurchase 시작', pendingRef.current.size)
@@ -341,20 +382,44 @@ async function handlePurchase() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <span style={{ fontSize: 13, color: '#666', width: 90 }}>Brush size</span>
-        <input type="range" min={1} max={10} value={brushSize} onChange={e => setBrushSize(parseInt(e.target.value))} style={{ flex: 1 }} />
-        <span style={{ fontSize: 13, color: '#999', width: 20 }}>{brushSize}</span>
-      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+  {[
+   { label: 'Small', pixels: 25 },
+{ label: 'Medium', pixels: 50 },
+{ label: 'Large', pixels: 100 },
+{ label: 'XL', pixels: 200 },
+  ].map(({ label, pixels }) => (
+    <button key={pixels} onClick={() => setBrushSize(pixels)} style={{
+      flex: 1, padding: '8px', borderRadius: 6, border: 'none',
+      background: brushSize === pixels ? '#555' : '#1f1f1f',
+      color: '#fff', cursor: 'pointer', fontSize: 13,
+      outline: brushSize === pixels ? '2px solid #888' : '2px solid transparent'
+    }}>
+      {label}<br/>
+      <span style={{ fontSize: 11, color: '#aaa' }}>${pixels}</span>
+    </button>
+  ))}
+</div>
 
       <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
         <canvas ref={canvasRef} width={COLS} height={ROWS}
-          style={{ display: 'block', width: '100%', cursor: 'crosshair', imageRendering: 'pixelated' }}
-          onMouseDown={e => { isPainting.current = true; pendingRef.current = new Set(); paint(e) }}
-          onMouseMove={paint}
-          onMouseUp={() => isPainting.current = false}
-          onMouseLeave={() => isPainting.current = false}
-        />
+  style={{ display: 'block', width: '100%', cursor: 'crosshair', imageRendering: 'pixelated', touchAction: 'none' }}
+  onMouseDown={e => { isPainting.current = true; pendingRef.current = new Set(); paint(e) }}
+  onMouseMove={paint}
+  onMouseUp={() => isPainting.current = false}
+  onMouseLeave={() => isPainting.current = false}
+  onTouchStart={e => {
+    e.preventDefault()
+    isPainting.current = true
+    pendingRef.current = new Set()
+    paintTouch(e)
+  }}
+  onTouchMove={e => {
+    e.preventDefault()
+    paintTouch(e)
+  }}
+  onTouchEnd={() => isPainting.current = false}
+/>
       </div>
 
       <div style={{ marginBottom: 12 }}>
