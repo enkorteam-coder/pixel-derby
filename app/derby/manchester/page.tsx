@@ -234,17 +234,20 @@ const loadPixels = async () => {
     }
   }
 
-  function paint(e: React.MouseEvent<HTMLCanvasElement>) {
+function paint(e: React.MouseEvent<HTMLCanvasElement>) {
     if (!isPainting.current) return
     const { c, r } = getPos(e)
     const canvas = canvasRef.current!
     const ctx = canvas.getContext('2d')!
     const grid = gridRef.current
     const color = selectedTeam === 'a' ? COLOR_A : COLOR_B
-    const b = brushSize
+    const b = brushSize  // 1~10
 
-    for (let dr = -b; dr <= b; dr++) {
-      for (let dc = -b; dc <= b; dc++) {
+    // 브러시 크기 b = b×10 픽셀 선택 (가로×세로 정사각형)
+    const side = Math.round(Math.sqrt(b * 10))
+
+    for (let dr = -Math.floor(side/2); dr <= Math.floor(side/2); dr++) {
+      for (let dc = -Math.floor(side/2); dc <= Math.floor(side/2); dc++) {
         const nr = r + dr, nc = c + dc
         if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue
         const idx = nr * COLS + nc
@@ -340,7 +343,7 @@ async function handlePurchase() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <span style={{ fontSize: 13, color: '#666', width: 90 }}>Brush size</span>
-        <input type="range" min={1} max={12} value={brushSize} onChange={e => setBrushSize(parseInt(e.target.value))} style={{ flex: 1 }} />
+        <input type="range" min={1} max={10} value={brushSize} onChange={e => setBrushSize(parseInt(e.target.value))} style={{ flex: 1 }} />
         <span style={{ fontSize: 13, color: '#999', width: 20 }}>{brushSize}</span>
       </div>
 
