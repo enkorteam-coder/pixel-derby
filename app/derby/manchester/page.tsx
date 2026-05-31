@@ -89,6 +89,7 @@ export default function ManchesterPage() {
   const [brushSize, setBrushSize] = useState(4)
   const [counts, setCounts] = useState({ a: 0, b: 0 })
   const [pending, setPending] = useState(0)
+  const [maskSize, setMaskSize] = useState(0)
 
   useEffect(() => {
   const params = new URLSearchParams(window.location.search)
@@ -298,7 +299,6 @@ async function handlePurchase() {
   }
 
   const totalSold = counts.a + counts.b
-  const [maskSize, setMaskSize] = useState(0)
   const redPct = totalSold > 0 ? Math.round(counts.a / totalSold * 100) : 50
 
   return (
