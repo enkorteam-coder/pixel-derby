@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
-const COLS = 1400
-const ROWS = 1100
+const COLS = 800
+const ROWS = 640
 
 const MANCHESTER_POLYGON: number[][] = [
   [0.028,0.463],[0.041,0.486],[0.054,0.491],[0.074,0.512],[0.080,0.515],
@@ -151,6 +151,7 @@ console.log('그리기 완료, grid[52794]:', grid[52794])  // 추가
     const mask = buildMask()
     console.log('마스크 크기:', mask.size)
     maskRef.current = mask
+    setMaskSize(mask.size)  // 추가
     const grid = gridRef.current
 
 const loadPixels = async () => {
@@ -294,7 +295,7 @@ async function handlePurchase() {
   }
 
   const totalSold = counts.a + counts.b
-  const maskSize = maskRef.current.size || 300000
+  const [maskSize, setMaskSize] = useState(0)
   const redPct = totalSold > 0 ? Math.round(counts.a / totalSold * 100) : 50
 
   return (

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
-const PAYPAL_API = 'https://api-m.sandbox.paypal.com'
+const PAYPAL_API = 'https://api-m.paypal.com'
 
 async function getAccessToken() {
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!
