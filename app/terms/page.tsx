@@ -7,7 +7,7 @@ export default function TermsPage() {
 
       <section style={{ marginBottom: '2rem' }}>
         <h2 style={{ fontSize: 20, marginBottom: '1rem' }}>1. Service Description</h2>
-        <p style={{ color: '#aaa', lineHeight: 1.8 }}>Pixel Derby is an interactive pixel map where users purchase pixels to claim territory for their favourite football colour. Each pixel costs $1, with a minimum purchase of 25 pixels ($25).</p>
+        <p style={{ color: '#aaa', lineHeight: 1.8 }}>Pixel Derby is an interactive pixel map where users purchase pixels to claim territory for their favourite football colour. Each pixel costs $1, with a minimum purchase of 10 pixels ($10).</p>
       </section>
 
       <section style={{ marginBottom: '2rem' }}>

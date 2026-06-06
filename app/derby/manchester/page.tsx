@@ -460,6 +460,14 @@ async function handlePurchase() {
         <p>• Claimed pixels cannot be repurchased — first come, first served</p>
         <p>• 20% of total revenue donated to the winning colour's youth academy</p>
       </div>
+
+      <div style={{ marginTop: '3rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+  <a href="/terms" style={{ fontSize: 12, color: '#555', textDecoration: 'none' }}>Terms of Service</a>
+  <a href="/privacy" style={{ fontSize: 12, color: '#555', textDecoration: 'none' }}>Privacy Policy</a>
+  <a href="/refund" style={{ fontSize: 12, color: '#555', textDecoration: 'none' }}>Refund Policy</a>
+</div>
+
     </main>
+    
   )
 }
