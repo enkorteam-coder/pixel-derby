@@ -74,6 +74,8 @@ export async function POST(req: NextRequest) {
 
     const pixels: { derby_id: string; pixel_index: number; team: string }[] = []
 
+    const usedIndexes = new Set<number>()
+
     const addBlock = (centerR: number, centerC: number, team: string) => {
       const [bRows, bCols] = BRUSH_SIZES[Math.floor(Math.random() * BRUSH_SIZES.length)]
       for (let dr = 0; dr < bRows; dr++) {
@@ -83,9 +85,10 @@ export async function POST(req: NextRequest) {
           if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue
           if (!pointInPolygon(c / COLS, r / ROWS, MANCHESTER_POLYGON)) continue
           const idx = r * COLS + c
-          if (!pixels.find(p => p.pixel_index === idx)) {
-            pixels.push({ derby_id: 'manchester', pixel_index: idx, team })
-          }
+          if (!usedIndexes.has(idx)) {
+  usedIndexes.add(idx)
+  pixels.push({ derby_id: 'manchester', pixel_index: idx, team })
+}
         }
       }
     }
