@@ -58,6 +58,13 @@ function pointInPolygon(x: number, y: number, polygon: number[][]): boolean {
   return inside
 }
 
+const BRUSH_SIZES = [
+  [5, 5],   // 25픽셀
+  [5, 10],  // 50픽셀
+  [10, 10], // 100픽셀
+  [10, 20], // 200픽셀
+]
+
 export async function POST(req: NextRequest) {
   try {
     const { secret } = await req.json()
@@ -65,46 +72,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 마스크 안에 있는 픽셀만 수집
-    const maskPixels: number[] = []
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        if (pointInPolygon(c / COLS, r / ROWS, MANCHESTER_POLYGON)) {
-          maskPixels.push(r * COLS + c)
+    const pixels: { derby_id: string; pixel_index: number; team: string }[] = []
+
+    const addBlock = (centerR: number, centerC: number, team: string) => {
+      const [bRows, bCols] = BRUSH_SIZES[Math.floor(Math.random() * BRUSH_SIZES.length)]
+      for (let dr = 0; dr < bRows; dr++) {
+        for (let dc = 0; dc < bCols; dc++) {
+          const r = centerR + dr
+          const c = centerC + dc
+          if (r < 0 || r >= ROWS || c < 0 || c >= COLS) continue
+          if (!pointInPolygon(c / COLS, r / ROWS, MANCHESTER_POLYGON)) continue
+          const idx = r * COLS + c
+          if (!pixels.find(p => p.pixel_index === idx)) {
+            pixels.push({ derby_id: 'manchester', pixel_index: idx, team })
+          }
         }
       }
     }
 
-    // 랜덤 섞기
-    maskPixels.sort(() => Math.random() - 0.5)
+    const redTarget = 4312
+    const blueTarget = 3617
 
-    // 브러시 블록 단위로 채우기 (25픽셀씩)
-const redCount = 4312  // 자연스러운 임의값
-const blueCount = 3617
-
-const redPixels: any[] = []
-const bluePixels: any[] = []
-
-for (let i = 0; i < maskPixels.length && redPixels.length < redCount; i += 25) {
-  for (let j = 0; j < 25 && redPixels.length < redCount; j++) {
-    if (maskPixels[i + j]) {
-      redPixels.push({ derby_id: 'manchester', pixel_index: maskPixels[i + j], team: 'a' })
+    // 랜덤 위치에 블록 단위로 채우기
+    let attempts = 0
+    while (pixels.filter(p => p.team === 'a').length < redTarget && attempts < 10000) {
+      const r = Math.floor(Math.random() * ROWS)
+      const c = Math.floor(Math.random() * COLS)
+      if (pointInPolygon(c / COLS, r / ROWS, MANCHESTER_POLYGON)) {
+        addBlock(r, c, 'a')
+      }
+      attempts++
     }
-  }
-  i += Math.floor(Math.random() * 50)  // 랜덤 간격
-}
 
-for (let i = redCount; i < maskPixels.length && bluePixels.length < blueCount; i += 25) {
-  for (let j = 0; j < 25 && bluePixels.length < blueCount; j++) {
-    if (maskPixels[i + j]) {
-      bluePixels.push({ derby_id: 'manchester', pixel_index: maskPixels[i + j], team: 'b' })
+    attempts = 0
+    while (pixels.filter(p => p.team === 'b').length < blueTarget && attempts < 10000) {
+      const r = Math.floor(Math.random() * ROWS)
+      const c = Math.floor(Math.random() * COLS)
+      if (pointInPolygon(c / COLS, r / ROWS, MANCHESTER_POLYGON)) {
+        addBlock(r, c, 'b')
+      }
+      attempts++
     }
-  }
-  i += Math.floor(Math.random() * 50)
-}
 
-    await supabaseAdmin.from('pixels').insert(redPixels)
-    await supabaseAdmin.from('pixels').insert(bluePixels)
+    const redPixels = pixels.filter(p => p.team === 'a')
+    const bluePixels = pixels.filter(p => p.team === 'b')
+
+    // 배치 단위로 삽입
+    const batchSize = 500
+    for (let i = 0; i < redPixels.length; i += batchSize) {
+      await supabaseAdmin.from('pixels').insert(redPixels.slice(i, i + batchSize))
+    }
+    for (let i = 0; i < bluePixels.length; i += batchSize) {
+      await supabaseAdmin.from('pixels').insert(bluePixels.slice(i, i + batchSize))
+    }
 
     return NextResponse.json({ success: true, red: redPixels.length, blue: bluePixels.length })
   } catch (err: any) {
