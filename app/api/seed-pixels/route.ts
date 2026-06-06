@@ -78,12 +78,30 @@ export async function POST(req: NextRequest) {
     // 랜덤 섞기
     maskPixels.sort(() => Math.random() - 0.5)
 
-    const redPixels = maskPixels.slice(0, 4000).map(idx => ({
-      derby_id: 'manchester', pixel_index: idx, team: 'a'
-    }))
-    const bluePixels = maskPixels.slice(4000, 7000).map(idx => ({
-      derby_id: 'manchester', pixel_index: idx, team: 'b'
-    }))
+    // 브러시 블록 단위로 채우기 (25픽셀씩)
+const redCount = 4312  // 자연스러운 임의값
+const blueCount = 3617
+
+const redPixels: any[] = []
+const bluePixels: any[] = []
+
+for (let i = 0; i < maskPixels.length && redPixels.length < redCount; i += 25) {
+  for (let j = 0; j < 25 && redPixels.length < redCount; j++) {
+    if (maskPixels[i + j]) {
+      redPixels.push({ derby_id: 'manchester', pixel_index: maskPixels[i + j], team: 'a' })
+    }
+  }
+  i += Math.floor(Math.random() * 50)  // 랜덤 간격
+}
+
+for (let i = redCount; i < maskPixels.length && bluePixels.length < blueCount; i += 25) {
+  for (let j = 0; j < 25 && bluePixels.length < blueCount; j++) {
+    if (maskPixels[i + j]) {
+      bluePixels.push({ derby_id: 'manchester', pixel_index: maskPixels[i + j], team: 'b' })
+    }
+  }
+  i += Math.floor(Math.random() * 50)
+}
 
     await supabaseAdmin.from('pixels').insert(redPixels)
     await supabaseAdmin.from('pixels').insert(bluePixels)
